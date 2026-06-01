@@ -45,6 +45,9 @@ jobs:
           syft dir:./server -o cyclonedx-json > "sbom/server-source-${GIT_SHA_SHORT}.cdx.json"
           syft dir:./fe -o cyclonedx-json > "sbom/fe-source-${GIT_SHA_SHORT}.cdx.json"
           syft dir:./fe2 -o cyclonedx-json > "sbom/fe2-source-${GIT_SHA_SHORT}.cdx.json"
+          syft dir:./server -o spdx-json > "sbom/server-source-${GIT_SHA_SHORT}.spdx.json"
+          syft dir:./fe -o spdx-json > "sbom/fe-source-${GIT_SHA_SHORT}.spdx.json"
+          syft dir:./fe2 -o spdx-json > "sbom/fe2-source-${GIT_SHA_SHORT}.spdx.json"
 
       - name: Build Docker images
         run: docker compose build
@@ -56,10 +59,19 @@ jobs:
           syft sbom_test-server:latest -o cyclonedx-json > "sbom/server-image-${GIT_SHA_SHORT}.cdx.json"
           syft sbom_test-fe:latest -o cyclonedx-json > "sbom/fe-image-${GIT_SHA_SHORT}.cdx.json"
           syft sbom_test-fe2:latest -o cyclonedx-json > "sbom/fe2-image-${GIT_SHA_SHORT}.cdx.json"
+          syft sbom_test-server:latest -o spdx-json > "sbom/server-image-${GIT_SHA_SHORT}.spdx.json"
+          syft sbom_test-fe:latest -o spdx-json > "sbom/fe-image-${GIT_SHA_SHORT}.spdx.json"
+          syft sbom_test-fe2:latest -o spdx-json > "sbom/fe2-image-${GIT_SHA_SHORT}.spdx.json"
 
-      - name: Upload SBOM artifacts
+      - name: Upload CycloneDX SBOM artifacts
         uses: actions/upload-artifact@v6
         with:
-          name: sbom-${{ github.sha }}
+          name: sbom-${{ github.sha }}-cdx
           path: sbom/*.cdx.json
+          retention-days: 90
+      - name: Upload SPDX SBOM artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: sbom-${{ github.sha }}-spdx
+          path: sbom/*.spdx.json
           retention-days: 90
