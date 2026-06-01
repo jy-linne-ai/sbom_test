@@ -1,0 +1,11 @@
+**/node_modules/
+**/vendor/bundle/
+**/.bundle/
+**/dist/
+**/.next/
+**/.pnpm-store/
+sbom/*.cdx.json
+sbom/*.spdx.json
+*.log
+**/.env
+**/.env.local
