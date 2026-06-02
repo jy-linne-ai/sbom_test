@@ -38,11 +38,11 @@ jobs:
 
       - name: Generate image SBOMs
         run: |
-          syft ${{ matrix.target.name }}:latest -o spdx-json > "sbom/${{ matrix.target.name }}-image-${ steps.sha.outputs.GIT_SHA_SHORT}.spdx.json"
+          syft ${{ matrix.target.name }}:latest -o spdx-json > "sbom/${{ matrix.target.name }}-image-${{ steps.sha.outputs.GIT_SHA_SHORT }}.spdx.json"
 
       - name: Upload SPDX SBOM artifacts
         uses: actions/upload-artifact@v6
         with:
-          name: sbom-${{ matrix.target.name }}-${ steps.sha.outputs.GIT_SHA_SHORT}-spdx
-          path: sbom/${{ matrix.target.name }}-image-${ steps.sha.outputs.GIT_SHA_SHORT}.spdx.json
+          name: sbom-${{ matrix.target.name }}-${{ steps.sha.outputs.GIT_SHA_SHORT }}-spdx
+          path: sbom/${{ matrix.target.name }}-*.spdx.json
           retention-days: 90
