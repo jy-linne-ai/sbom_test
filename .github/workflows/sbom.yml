@@ -63,7 +63,7 @@ jobs:
           syft "docker:${IMAGE}" -o spdx-json > "sbom/${{ matrix.name }}-image-${{ steps.sha.outputs.GIT_SHA_SHORT }}.spdx.json"
 
       - name: Upload SPDX SBOM artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: sbom-${{ matrix.name }}-${{ steps.sha.outputs.GIT_SHA_SHORT }}-spdx
           path: sbom/${{ matrix.name }}-*.spdx.json

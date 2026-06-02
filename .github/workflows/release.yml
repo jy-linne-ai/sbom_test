@@ -65,7 +65,7 @@ jobs:
           echo "${{ matrix.name }}=docker:${{ matrix.name }}@${{ steps.build.outputs.digest }}" > "meta/${{ matrix.name }}-${{ github.ref_name }}.txt"
 
       - name: Upload release assets
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: release-${{ matrix.name }}-${{ github.ref_name }}
           path: |
@@ -81,7 +81,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Download SBOM artifacts
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           pattern: release-*
           merge-multiple: true
@@ -116,7 +116,7 @@ jobs:
           cat RELEASE_NOTES.md
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           generate_release_notes: true
           append_body: true
