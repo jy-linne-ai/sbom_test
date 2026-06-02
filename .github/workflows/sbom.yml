@@ -40,14 +40,19 @@ jobs:
         id: build
         uses: docker/build-push-action@v6
         with:
-          push: false
           context: ./${{ matrix.name }}
-          # tags: |
-          #   ${{ matrix.name }}:latest
+          push: false
+          load: true # load: true is required to get the digest from the buildx image
+          tags: ${{ matrix.name }}:latest # tags is required to get the digest from the buildx image
 
       - name: Generate image SBOMs
         run: |
-          syft "${{ matrix.name }}@${{ steps.build.outputs.digest }}" -o spdx-json > "sbom/${{ matrix.name }}-image-${{ steps.sha.outputs.GIT_SHA_SHORT }}.spdx.json"
+          DIGEST="${{ steps.build.outputs.digest }}"
+          if [ -z "${DIGEST}" ]; then
+            echo "::error::build digest is empty; check build-push-action load/tags"
+            exit 1
+          fi
+          syft "${{ matrix.name }}@${DIGEST}" -o spdx-json > "sbom/${{ matrix.name }}-image-${{ steps.sha.outputs.GIT_SHA_SHORT }}.spdx.json"
 
       - name: Upload SPDX SBOM artifacts
         uses: actions/upload-artifact@v6
