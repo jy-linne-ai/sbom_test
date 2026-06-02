@@ -44,16 +44,20 @@ jobs:
           load: true # load: true is required to get the digest from the buildx image
           tags: ${{ matrix.name }}:latest # tags is required to get the digest from the buildx image
 
-      # docker: -> local docker image reference
-      # @${DIGEST} -> buildx image digest
       - name: Generate image SBOMs
         run: |
+          IMAGE="${{ matrix.name }}:latest"
           DIGEST="${{ steps.build.outputs.digest }}"
           if [ -z "${DIGEST}" ]; then
             echo "::error::build digest is empty; check build-push-action load/tags"
             exit 1
           fi
-          syft "docker:${{ matrix.name }}@${DIGEST}" -o spdx-json > "sbom/${{ matrix.name }}-image-${{ github.ref_name }}.spdx.json"
+          if ! docker image inspect "${IMAGE}" >/dev/null 2>&1; then
+            echo "::error::local image ${IMAGE} not found after build"
+            docker images
+            exit 1
+          fi
+          syft "docker:${IMAGE}" -o spdx-json > "sbom/${{ matrix.name }}-image-${{ github.ref_name }}.spdx.json"
 
       - name: Write image digest metadata
         run: |
