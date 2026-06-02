@@ -7,32 +7,16 @@ on:
 jobs:
   generate-sbom:
     runs-on: ubuntu-latest
-
+    strategy:
+      fail-fast: true
+      matrix:
+        target:
+          - name: server
+          - name: fe
+          - name: fe2
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-
-      - name: Setup Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: "3.3"
-          bundler-cache: true
-          working-directory: server
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: "20"
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v6
-        with:
-          version: 10
-
-      - name: Install frontend dependencies
-        run: |
-          npm ci --prefix fe
-          pnpm install --frozen-lockfile --dir fe2
 
       - name: Install Syft
         uses: anchore/sbom-action/download-syft@v0
@@ -42,36 +26,20 @@ jobs:
           mkdir -p sbom
           GIT_SHA="${{ github.sha }}"
           GIT_SHA_SHORT="${GIT_SHA:0:7}"
-          syft dir:./server -o cyclonedx-json > "sbom/server-source-${GIT_SHA_SHORT}.cdx.json"
-          syft dir:./fe -o cyclonedx-json > "sbom/fe-source-${GIT_SHA_SHORT}.cdx.json"
-          syft dir:./fe2 -o cyclonedx-json > "sbom/fe2-source-${GIT_SHA_SHORT}.cdx.json"
-          syft dir:./server -o spdx-json > "sbom/server-source-${GIT_SHA_SHORT}.spdx.json"
-          syft dir:./fe -o spdx-json > "sbom/fe-source-${GIT_SHA_SHORT}.spdx.json"
-          syft dir:./fe2 -o spdx-json > "sbom/fe2-source-${GIT_SHA_SHORT}.spdx.json"
+          syft dir:./${{ matrix.target.name }} -o spdx-json > "sbom/${{ matrix.target.name }}-source-${GIT_SHA_SHORT}.spdx.json"
 
       - name: Build Docker images
-        run: docker compose build
+        run: docker build -t ${{ matrix.target.name }}:latest -f ${matrix.target.name}/Dockerfile ${matrix.target.name}
 
       - name: Generate image SBOMs
         run: |
           GIT_SHA="${{ github.sha }}"
           GIT_SHA_SHORT="${GIT_SHA:0:7}"
-          syft sbom_test-server:latest -o cyclonedx-json > "sbom/server-image-${GIT_SHA_SHORT}.cdx.json"
-          syft sbom_test-fe:latest -o cyclonedx-json > "sbom/fe-image-${GIT_SHA_SHORT}.cdx.json"
-          syft sbom_test-fe2:latest -o cyclonedx-json > "sbom/fe2-image-${GIT_SHA_SHORT}.cdx.json"
-          syft sbom_test-server:latest -o spdx-json > "sbom/server-image-${GIT_SHA_SHORT}.spdx.json"
-          syft sbom_test-fe:latest -o spdx-json > "sbom/fe-image-${GIT_SHA_SHORT}.spdx.json"
-          syft sbom_test-fe2:latest -o spdx-json > "sbom/fe2-image-${GIT_SHA_SHORT}.spdx.json"
+          syft ${{ matrix.target.name }}:latest -o spdx-json > "sbom/${{ matrix.target.name }}-image-${GIT_SHA_SHORT}.spdx.json"
 
-      - name: Upload CycloneDX SBOM artifacts
-        uses: actions/upload-artifact@v6
-        with:
-          name: sbom-${{ github.sha }}-cdx
-          path: sbom/*.cdx.json
-          retention-days: 90
       - name: Upload SPDX SBOM artifacts
         uses: actions/upload-artifact@v6
         with:
-          name: sbom-${{ github.sha }}-spdx
-          path: sbom/*.spdx.json
+          name: sbom-${{matrix.target.name }}-${{ github.sha }}-spdx
+          path: sbom/${{ matrix.target.name }}-*.spdx.json
           retention-days: 90
