@@ -44,6 +44,8 @@ jobs:
           load: true # load: true is required to get the digest from the buildx image
           tags: ${{ matrix.name }}:latest # tags is required to get the digest from the buildx image
 
+      # docker: -> local docker image reference
+      # @${DIGEST} -> buildx image digest
       - name: Generate image SBOMs
         run: |
           DIGEST="${{ steps.build.outputs.digest }}"
@@ -51,12 +53,12 @@ jobs:
             echo "::error::build digest is empty; check build-push-action load/tags"
             exit 1
           fi
-          syft "${{ matrix.name }}@${DIGEST}" -o spdx-json > "sbom/${{ matrix.name }}-image-${{ github.ref_name }}.spdx.json"
+          syft "docker:${{ matrix.name }}@${DIGEST}" -o spdx-json > "sbom/${{ matrix.name }}-image-${{ github.ref_name }}.spdx.json"
 
       - name: Write image digest metadata
         run: |
           mkdir -p meta
-          echo "${{ matrix.name }}=${{ matrix.name }}@${{ steps.build.outputs.digest }}" > "meta/${{ matrix.name }}-${{ github.ref_name }}.txt"
+          echo "${{ matrix.name }}=docker:${{ matrix.name }}@${{ steps.build.outputs.digest }}" > "meta/${{ matrix.name }}-${{ github.ref_name }}.txt"
 
       - name: Upload release assets
         uses: actions/upload-artifact@v6
