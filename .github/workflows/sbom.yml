@@ -10,13 +10,16 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        target:
+        include:
           - name: server
           - name: fe
           - name: fe2
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Install Syft
         uses: anchore/sbom-action/download-syft@v0
@@ -31,18 +34,24 @@ jobs:
       - name: Generate source SBOMs
         run: |
           mkdir -p sbom
-          syft dir:./${{ matrix.target.name }} -o spdx-json > "sbom/${{ matrix.target.name }}-source-${{ steps.sha.outputs.GIT_SHA_SHORT }}.spdx.json"
+          syft dir:./${{ matrix.name }} -o spdx-json > "sbom/${{ matrix.name }}-source-${{ steps.sha.outputs.GIT_SHA_SHORT }}.spdx.json"
 
       - name: Build Docker images
-        run: docker build -t ${{ matrix.target.name }}:latest -f ${{ matrix.target.name }}/Dockerfile ${{ matrix.target.name }}
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          push: false
+          context: ./${{ matrix.name }}
+          # tags: |
+          #   ${{ matrix.name }}:latest
 
       - name: Generate image SBOMs
         run: |
-          syft ${{ matrix.target.name }}:latest -o spdx-json > "sbom/${{ matrix.target.name }}-image-${{ steps.sha.outputs.GIT_SHA_SHORT }}.spdx.json"
+          syft "${{ matrix.name }}@${{ steps.build.outputs.digest }}" -o spdx-json > "sbom/${{ matrix.name }}-image-${{ steps.sha.outputs.GIT_SHA_SHORT }}.spdx.json"
 
       - name: Upload SPDX SBOM artifacts
         uses: actions/upload-artifact@v6
         with:
-          name: sbom-${{ matrix.target.name }}-${{ steps.sha.outputs.GIT_SHA_SHORT }}-spdx
-          path: sbom/${{ matrix.target.name }}-*.spdx.json
+          name: sbom-${{ matrix.name }}-${{ steps.sha.outputs.GIT_SHA_SHORT }}-spdx
+          path: sbom/${{ matrix.name }}-*.spdx.json
           retention-days: 90

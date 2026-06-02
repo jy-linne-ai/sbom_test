@@ -1,0 +1,113 @@
+name: Release With SBOM
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+  # packages: write
+
+jobs:
+  build-and-sbom:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - name: server
+          - name: fe
+          - name: fe2
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Install Syft
+        uses: anchore/sbom-action/download-syft@v0
+
+      - name: Generate source SBOMs
+        run: |
+          mkdir -p sbom
+          syft dir:./${{ matrix.name }} -o spdx-json > "sbom/${{ matrix.name }}-source-${{ github.ref_name }}.spdx.json"
+
+      - name: Build Docker images
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          push: false
+          context: ./${{ matrix.name }}
+          # tags: |
+          #   ${{ matrix.name }}:latest
+
+      - name: Generate image SBOMs
+        run: |
+          syft "${{ matrix.name }}@${{ steps.build.outputs.digest }}" -o spdx-json > "sbom/${{ matrix.name }}-image-${{ github.ref_name }}.spdx.json"
+
+      - name: Write image digest metadata
+        run: |
+          mkdir -p meta
+          echo "${{ matrix.name }}=${{ matrix.name }}@${{ steps.build.outputs.digest }}" > "meta/${{ matrix.name }}-${{ github.ref_name }}.txt"
+
+      - name: Upload release assets
+        uses: actions/upload-artifact@v6
+        with:
+          name: release-${{ matrix.name }}-${{ github.ref_name }}
+          path: |
+            sbom/${{ matrix.name }}-*.spdx.json
+            meta/${{ matrix.name }}-*.txt
+          retention-days: 90
+
+  release:
+    needs: build-and-sbom
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Download SBOM artifacts
+        uses: actions/download-artifact@v6
+        with:
+          pattern: release-*
+          merge-multiple: true
+          path: release-assets
+
+      - name: Prepare SBOM upload directory
+        run: |
+          mkdir -p sbom-upload
+          find release-assets -name '*.spdx.json' -type f -exec cp {} sbom-upload/ \;
+          ls -1 sbom-upload/
+
+      - name: Prepare release notes (SBOM + images)
+        run: |
+          TAG="${{ github.ref_name }}"
+          {
+            echo "## CI-built images (digest)"
+            echo ""
+            echo "Images are built in CI only (\`push: false\`); they are not published to GHCR."
+            echo ""
+            find release-assets -path '*/meta/*.txt' -type f | sort | while read -r f; do
+              echo "- \`$(cat "$f")\`"
+            done
+            echo ""
+            echo "## SBOM (SPDX)"
+            echo ""
+            echo "Source and image SBOMs for tag \`${TAG}\`. Image SBOMs were scanned from the Buildx image digest (\`name@sha256:...\`) for the build above."
+            echo ""
+            find sbom-upload -name '*.spdx.json' -type f | sort | while read -r f; do
+              echo "- \`$(basename "$f")\`"
+            done
+          } > RELEASE_NOTES.md
+          cat RELEASE_NOTES.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          append_body: true
+          body_path: RELEASE_NOTES.md
+          files: sbom-upload/*
